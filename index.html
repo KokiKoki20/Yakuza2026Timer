@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026 Timer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@1,900&family=Oswald:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 30% 50%, #0d1b2a 0%, #02040a 100%);
+            color: #fff; font-family: 'Oswald', sans-serif; overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- THEMED SCROLLBAR --- */
+        .song-grid::-webkit-scrollbar { width: 4px; }
+        .song-grid::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.3); }
+        .song-grid::-webkit-scrollbar-thumb { background: #00f2ff; border-radius: 10px; box-shadow: 0 0 10px rgba(0, 242, 255, 0.5); }
+
+        #dynamic-glow {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 10% 50%, rgba(0, 242, 255, 0.15) 0%, transparent 50%);
+            z-index: 2; pointer-events: none;
+        }
+
+        canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+        #rainCanvas { z-index: 1; }
+        #sparkCanvas { z-index: 23; } 
+        #confettiCanvas { z-index: 24; } 
+
+        #main-ui {
+            position: relative; z-index: 10;
+            display: flex; flex-direction: column;
+            justify-content: center; height: 100vh;
+            padding-left: 10%;
+            transition: transform 1.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.5s, filter 1.5s;
+        }
+
+        #clock {
+            font-family: 'Exo 2', sans-serif; font-size: clamp(6rem, 12vw, 12rem);
+            font-style: italic; margin: 0; line-height: 0.8;
+            color: #fff; 
+            text-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 242, 255, 0.4);
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .dashboard {
+            margin-top: 60px; display: flex; gap: 100px;
+            border-top: 2px solid rgba(0, 242, 255, 0.3);
+            padding-top: 30px; width: fit-content;
+        }
+
+        .label { font-size: 1.1rem; letter-spacing: 5px; color: #00f2ff; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; }
+        .value { font-size: clamp(2.5rem, 4vw, 4rem); font-family: 'Exo 2', sans-serif; font-weight: 900; color: #fff; font-style: italic; font-variant-numeric: tabular-nums; text-shadow: 0 5px 15px rgba(0, 0, 0, 0.9); }
+
+        .volume-container {
+            margin-bottom: 25px;
+            padding: 10px;
+            border-bottom: 1px solid rgba(0, 242, 255, 0.2);
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #00f2ff;
+        }
+
+        #celebration-container {
+            position: fixed; bottom: -100vh; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center;
+            z-index: 25; 
+            transition: bottom 2s cubic-bezier(0.16, 1, 0.3, 1); width: 100%;
+            pointer-events: none;
+        }
+        #happy-2026 { font-family: 'Exo 2', sans-serif; font-size: clamp(5rem, 10vw, 12rem); font-style: italic; color: #f1c40f; text-shadow: 0 0 40px rgba(241, 196, 15, 0.7); margin-bottom: -10px; }
+        
+        #yakuza-img-box img { 
+            width: clamp(350px, 50vw, 750px); 
+            border: 4px solid #fff; 
+            box-shadow: 0 0 60px rgba(0,0,0,1);
+        }
+        .celebrating img { animation: auraPulse 2s infinite alternate; }
+        @keyframes auraPulse {
+            from { box-shadow: 0 0 40px rgba(241, 196, 15, 0.4); }
+            to { box-shadow: 0 0 80px rgba(241, 196, 15, 0.8), 0 0 20px #fff; }
+        }
+
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px);
+            z-index: 3000; display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .boot-text { font-size: 1.5rem; letter-spacing: 15px; color: #00f2ff; font-weight: 900; text-transform: uppercase; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+        #song-menu { position: fixed; top: 0; right: 0; width: 300px; height: 100%; background: rgba(5, 10, 20, 0.98); border-left: 1px solid rgba(0, 242, 255, 0.3); z-index: 2000; padding: 20px 15px; box-sizing: border-box; backdrop-filter: blur(20px); transform: translateX(300px); transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        
+        #menu-toggle { 
+            position: fixed; top: 50%; right: 0; 
+            background: #00f2ff; color: #000; width: 25px; height: 50px; 
+            display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; z-index: 2001; font-weight: bold; font-size: 14px; 
+            border-radius: 8px 0 0 8px; transform: translateY(-50%); 
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        body.menu-open #song-menu { transform: translateX(0); }
+        body.menu-open #menu-toggle { transform: translateY(-50%) translateX(-300px); }
+
+        .song-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow-y: auto; max-height: 70vh; padding-bottom: 20px; padding-right: 5px; }
+        .song-card { background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .song-card.active { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); box-shadow: inset 0 0 10px rgba(0, 242, 255, 0.2); }
+        .album-art { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 2px; }
+        
+        .btn-group { display: flex; flex-direction: column; gap: 4px; margin-top: 5px; }
+        .select-btn, .preview-btn { background: transparent; color: #00f2ff; border: 1px solid rgba(0, 242, 255, 0.3); width: 100%; padding: 4px 0; cursor: pointer; font-size: 0.6rem; font-weight: bold; text-transform: uppercase; }
+        .select-btn:hover, .preview-btn:hover { background: rgba(0, 242, 255, 0.1); }
+        .song-card.active .select-btn { background: #00f2ff; color: #000; }
+        .preview-btn.playing { background: #ff0055; color: #fff; border-color: #ff0055; }
+    </style>
+</head>
+<body onclick="handleGlobalClick(event)">
+
+    <div id="boot-screen"><div class="boot-text">Press to Start</div></div>
+
+    <div id="song-menu">
+        <div class="volume-container">
+            <h3 style="color:#00f2ff; letter-spacing: 4px; font-size: 0.8rem; margin: 0 0 10px 0;">MASTER VOLUME</h3>
+            <input type="range" id="masterVolume" min="0" max="1" step="0.01" value="1" oninput="updateVolume()">
+        </div>
+        <h3 style="color:#00f2ff; letter-spacing: 4px; font-size: 0.8rem; margin: 0 0 15px 0;">MUSIC LIBRARY</h3>
+        <div class="song-grid" id="songList"></div>
+    </div>
+    <div id="menu-toggle" onclick="toggleMenu(event)">&lt;</div>
+
+    <div id="dynamic-glow"></div>
+    <canvas id="rainCanvas"></canvas>
+    <canvas id="sparkCanvas"></canvas>
+    <canvas id="confettiCanvas"></canvas>
+
+    <div id="main-ui">
+        <div id="clock">00:00:00</div>
+        <div class="dashboard">
+            <div><div class="label">Music starts in</div><div id="start-timer" class="value">00:00:00</div></div>
+            <div><div class="label" style="color: #ff0055;">Time till midnight</div><div id="midnight-timer" class="value" style="color: #ff0055;">00:00:00</div></div>
+        </div>
+    </div>
+
+    <div id="celebration-container">
+        <h1 id="happy-2026">2026</h1>
+        <div id="yakuza-img-box">
+            <img src="https://c.tenor.com/6uGU8O4lUSYAAAAd/tenor.gif" alt="Yakuzer 2026">
+            <p style="font-size: clamp(1.2rem, 2.5vw, 2.5rem); letter-spacing: 12px; font-weight: 900; margin-top: 20px; text-transform: uppercase; text-align: center; color: #fff; text-shadow: 0 0 20px rgba(0,0,0,1);">Have an Ichimazing 2026</p>
+        </div>
+    </div>
+
+    <audio id="waitingMusic" src="lostintherain.mp3" loop></audio>
+    <audio id="forFaith" src="music/ForFaith.mp3" preload="auto"></audio>
+    <audio id="previewAudio"></audio>
+
+<script>
+    const songs = [
+        { id: 'faith', name: 'For Faith', file: 'music/ForFaith.mp3', cover: 'cover/y4.jpg', dropTime: 70 },
+        { id: 'receiveandbiteyou', name: 'Receive and Bite You', file: 'music/ReceiveandBiteYou.mp3', cover: 'cover/y4.jpg', dropTime: 24 },
+        { id: 'shinadavsdaigo', name: 'Shinada vs Daigo', file: 'music/ShinadaVsDaigo.mp3', cover: 'cover/y5b.png', dropTime: 69 },
+        { id: 'ascatteredeternalmoment', name: 'A Scattered, Eternal Moment', file: 'music/AScatteredEternalMoment.mp3', cover: 'cover/yk2.jpg', dropTime: 14 },
+        { id: 'forwhossake', name: 'For Who`s Sake', file: 'music/ForWhosSake.mp3', cover: 'cover/yk1.jpg', dropTime: 20.6 },
+        { id: 'fly', name: 'Fly', file: 'music/Fly.mp3', cover: 'cover/y3.jpg', dropTime: 126 },
+        { id: 'todayisadiamond', name: 'Today Is a Diamond', file: 'music/TodayIsADiamond.mp3', cover: 'cover/kiryu.jpg', dropTime: 63 },
+        { id: 'judgementkiryu', name: 'JUDGEMENT-Shinpan-【Full Spec Edition】', file: 'music/JudgementKiryu.mp3', cover: 'cover/kiryu.jpg', dropTime: 62 },
+        { id: 'judgementnishiki', name: 'JUDGEMENT -Referee- (Brother NISHIKI Edition)', file: 'music/JudgementNishiki.mp3', cover: 'cover/y0.jpg', dropTime: 62 },
+        { id: 'machinegunkisskiryu', name: 'MachineGun Kiss【Full Spec Edition】', file: 'music/MachineGunKissKiryu.mp3', cover: 'cover/kiryu.jpg', dropTime: 63 },
+        { id: 'machinegunkissshinada', name: 'MachineGun Kiss [Full Swing Edition]', file: 'music/MachineGunKissShinada.mp3', cover: 'cover/bestof1.jpg', dropTime: 63 },
+        { id: 'pureloveinkamurochoakiyama', name: 'Pure Love in Kamurocho [Full Spec Edition]', file: 'music/PureLoveinKamurochoAkiyama.mp3', cover: 'cover/bestof2.jpg', dropTime: 62 },
+        { id: 'pureloveinkamurochoryuji', name: 'Pure Love in Kamurocho ["The Dragon of Kansai" Special Edition]', file: 'music/PureLoveinKamurochoRyuji.mp3', cover: 'cover/bestof2.jpg', dropTime: 62 }
+    ];
+
+    let currentDropTime = songs[0].dropTime;
+    let fadeStarted = false; 
+    let songStarted = false;
+    const songListUI = document.getElementById('songList');
+    const audioWait = document.getElementById('waitingMusic');
+    const audioMain = document.getElementById('forFaith');
+    const audioPrev = document.getElementById('previewAudio');
+    const volumeSlider = document.getElementById('masterVolume');
+
+    function updateVolume() {
+        const vol = parseFloat(volumeSlider.value);
+        if (!fadeStarted) {
+            const isPreviewing = !audioPrev.paused;
+            audioWait.volume = isPreviewing ? (vol * 0.2) : vol;
+        }
+        audioMain.volume = vol;
+        audioPrev.volume = vol;
+    }
+
+    songs.forEach((song, index) => {
+        const card = document.createElement('div');
+        card.className = `song-card ${index === 0 ? 'active' : ''}`;
+        card.id = `card-${song.id}`;
+        card.innerHTML = `
+            <img src="${song.cover}" class="album-art" onerror="this.src='https://pbs.twimg.com/media/DUx1nMFW4AAVuOW.jpg'">
+            <div class="song-title" style="font-size:0.8rem; color:#aaa; margin:3px 0;">${song.name}</div>
+            <div class="btn-group">
+                <button class="select-btn" onclick="selectSong('${song.id}', '${song.file}', ${song.dropTime}, event)">Select</button>
+                <button class="preview-btn" id="prev-${song.id}" onclick="previewSong('${song.id}', '${song.file}', event)">Preview</button>
+            </div>`;
+        songListUI.appendChild(card);
+    });
+
+    function toggleMenu(e) { 
+        e.stopPropagation(); 
+        document.body.classList.toggle('menu-open'); 
+        document.getElementById('menu-toggle').innerHTML = document.body.classList.contains('menu-open') ? "&gt;" : "&lt;"; 
+    }
+
+    function selectSong(id, file, dropTime, e) { 
+        e.stopPropagation(); 
+        audioMain.src = file; audioMain.load(); 
+        currentDropTime = dropTime; 
+        document.querySelectorAll('.song-card').forEach(c => c.classList.remove('active')); 
+        document.getElementById(`card-${id}`).classList.add('active'); 
+    }
+
+    function previewSong(id, file, e) {
+        e.stopPropagation();
+        const btn = document.getElementById(`prev-${id}`);
+        if (!audioPrev.paused && audioPrev.src.includes(file)) {
+            audioPrev.pause();
+            btn.innerText = "Preview";
+            btn.classList.remove('playing');
+            updateVolume();
+        } else {
+            document.querySelectorAll('.preview-btn').forEach(b => { b.innerText = "Preview"; b.classList.remove('playing'); });
+            audioPrev.src = file;
+            audioPrev.play();
+            btn.innerText = "Stop";
+            btn.classList.add('playing');
+            updateVolume();
+        }
+    }
+    
+    audioPrev.onended = () => {
+        document.querySelectorAll('.preview-btn').forEach(b => { b.innerText = "Preview"; b.classList.remove('playing'); });
+        updateVolume();
+    };
+
+    function startBackgroundFade() {
+        if (fadeStarted) return;
+        fadeStarted = true;
+        const startVol = audioWait.volume;
+        const fadeDuration = 4800; // slightly under 5s to ensure silence by 0
+        const startTime = Date.now();
+
+        const fadeInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / fadeDuration;
+            if (progress >= 1) {
+                audioWait.volume = 0;
+                audioWait.pause();
+                clearInterval(fadeInterval);
+            } else {
+                audioWait.volume = startVol * (1 - progress);
+            }
+        }, 50);
+    }
+
+    function switchMusic() {
+        if (songStarted) return;
+        songStarted = true;
+        
+        audioWait.pause();
+        audioWait.volume = 0;
+        audioPrev.pause(); 
+        
+        audioMain.volume = volumeSlider.value; 
+        audioMain.play();
+    }
+
+    const rCanvas = document.getElementById('rainCanvas'), rCtx = rCanvas.getContext('2d');
+    const sCanvas = document.getElementById('sparkCanvas'), sCtx = sCanvas.getContext('2d');
+    const cCanvas = document.getElementById('confettiCanvas'), cCtx = cCanvas.getContext('2d');
+    function resize() { rCanvas.width = sCanvas.width = cCanvas.width = window.innerWidth; rCanvas.height = sCanvas.height = cCanvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+
+    class RainDrop {
+        constructor() { this.x = Math.random() * rCanvas.width; this.y = Math.random() * rCanvas.height; this.speed = Math.random() * 15 + 10; this.len = Math.random() * 20 + 10; }
+        draw() { rCtx.strokeStyle = 'rgba(174, 238, 255, 0.15)'; rCtx.lineWidth = 1; rCtx.beginPath(); rCtx.moveTo(this.x, this.y); rCtx.lineTo(this.x, this.y + this.len); rCtx.stroke(); this.y += this.speed; if (this.y > rCanvas.height) this.y = -20; }
+    }
+    const drops = Array.from({length: 120}, () => new RainDrop());
+
+    const sparks = [];
+    class Spark {
+        constructor(side) {
+            this.x = side === 'left' ? 0 : sCanvas.width;
+            this.y = sCanvas.height;
+            const angle = side === 'left' ? (Math.random() * -Math.PI/2.5) : (Math.random() * Math.PI/2.5 + Math.PI);
+            const power = Math.random() * 18 + 12;
+            this.vx = Math.cos(angle) * power;
+            this.vy = Math.sin(angle) * power;
+            this.life = 1; this.decay = Math.random() * 0.02 + 0.01;
+        }
+        draw() {
+            sCtx.fillStyle = `rgba(255, ${180 + Math.random()*75}, 50, ${this.life})`;
+            sCtx.beginPath(); sCtx.arc(this.x, this.y, Math.random() * 3.5, 0, Math.PI * 2); sCtx.fill();
+            this.x += this.vx; this.y += this.vy; this.vy += 0.3; this.life -= this.decay;
+        }
+    }
+
+    const confettis = [];
+    class Confetti {
+        constructor() { this.init(); }
+        init() { this.x = Math.random() * cCanvas.width; this.y = -20; this.size = Math.random() * 8 + 4; this.color = ['#00f2ff','#ff0055','#f1c40f','#ffffff'][Math.floor(Math.random()*4)]; this.speed = Math.random() * 3 + 2; this.angle = Math.random() * 6; }
+        draw() { cCtx.fillStyle = this.color; cCtx.save(); cCtx.translate(this.x, this.y); cCtx.rotate(this.angle); cCtx.fillRect(-this.size/2, -this.size/2, this.size, this.size); cCtx.restore(); this.y += this.speed; this.angle += 0.1; if (this.y > cCanvas.height) this.y = -20; }
+    }
+
+    let isRunning = false, triggered = false;
+    function handleGlobalClick() { if(!isRunning) { isRunning = true; document.getElementById('boot-screen').style.display = 'none'; updateVolume(); audioWait.play(); } }
+    function format(ms) { let s = Math.max(0, Math.floor(ms/1000)), m = Math.floor(s/60), h = Math.floor(m/60); return [h, m%60, s%60].map(v => v.toString().padStart(2,'0')).join(':'); }
+
+    function loop() {
+        const now = new Date(), target = new Date();
+        
+        // --- TARGET TIME INPUT ---
+        target.setHours(22, 23, 0, 0); 
+        
+        const msMid = target - now;
+        const msStart = msMid - (currentDropTime * 1000);
+
+        document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
+        
+        if(isRunning) {
+            document.getElementById('midnight-timer').innerText = format(msMid);
+            document.getElementById('start-timer').innerText = format(msStart);
+            
+            // FADE OUT check: Start fade at 5 seconds remaining
+            if (msStart <= 5000 && msStart > 0 && !fadeStarted) {
+                startBackgroundFade();
+            }
+
+            // TRIGGER main song at 0
+            if (msStart <= 0 && !songStarted) { 
+                switchMusic();
+            }
+
+            // Midnight celebration
+            if(msMid <= 0 && !triggered) {
+                triggered = true;
+                document.getElementById('main-ui').style.opacity = "0.2";
+                document.getElementById('main-ui').style.filter = "blur(8px)";
+                const cel = document.getElementById('celebration-container');
+                cel.style.bottom = "5vh";
+                cel.classList.add('celebrating');
+                for(let i=0; i<250; i++) confettis.push(new Confetti());
+            }
+        }
+
+        rCtx.clearRect(0,0, rCanvas.width, rCanvas.height);
+        drops.forEach(d => d.draw());
+        sCtx.clearRect(0,0, sCanvas.width, sCanvas.height);
+        if(triggered) {
+            if(Math.random() > 0.1) sparks.push(new Spark('left'));
+            if(Math.random() > 0.1) sparks.push(new Spark('right'));
+            sparks.forEach((s, i) => { s.draw(); if(s.life <= 0) sparks.splice(i, 1); });
+        }
+        cCtx.clearRect(0,0, cCanvas.width, cCanvas.height);
+        if(triggered) confettis.forEach(c => c.draw());
+        requestAnimationFrame(loop);
+    }
+    loop();
+</script>
+</body>
+</html>
